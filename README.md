@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+[Read the Code version of the README, don't look through the Preview]
 #Goal of project
 
 Predict stock price trends while explaining the reasoning behind the prediction. 
