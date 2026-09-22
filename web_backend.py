@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import numpy as np
 import pandas as pd
-import akshare as ak
+import akshare as ak #might not need akshare if yfinance works for all stonks
 import yfinance as yf  #requests might be blocked
 import torch
 import torch.nn as nn
@@ -17,10 +17,9 @@ app = Flask(__name__)
 CORS(app)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"🔧 Using device: {device}")
+print(f" using device: {device}")
 
 
-# ==================== MODEL CLASS ====================
 class PredictionModel(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers, output_dim):
         super(PredictionModel, self).__init__()
@@ -37,7 +36,7 @@ class PredictionModel(nn.Module):
         return out
 
 
-# ==================== LOAD MODEL & SCALER ====================
+
 seq_length = 60
 
 if not os.path.exists('models/model.pth'):
@@ -58,9 +57,6 @@ print("✅ Model & scaler loaded successfully!")
 
 #translate chinese data into english data
 def fetch_stock_data_akshare(ticker, period="1y"):
-    """
-    Fetches stock data using AKShare as fallback for Chinese stocks.
-    """
     try:
         from datetime import datetime, timedelta
 
@@ -72,7 +68,6 @@ def fetch_stock_data_akshare(ticker, period="1y"):
         else:
             start_date = (datetime.now() - timedelta(days=1 * 365)).strftime("%Y%m%d")
 
-        # Try US stocks first
         try:
             df = ak.stock_us_hist(symbol=ticker, period="daily",
                                   start_date=start_date, end_date=end_date, adjust="")
@@ -91,7 +86,6 @@ def fetch_stock_data_akshare(ticker, period="1y"):
         except:
             pass
 
-        # Try A-shares (Chinese stocks)
         try:
             df = ak.stock_zh_a_hist(symbol=ticker, period="daily",
                                     start_date=start_date, end_date=end_date, adjust="")
@@ -115,19 +109,16 @@ def fetch_stock_data_akshare(ticker, period="1y"):
         print(f"AKShare error for {ticker}: {e}")
         return pd.DataFrame()
 
-# ==================== PREDICTION FUNCTION ====================
 def predict_price(ticker):
     try:
-        # Try yfinance first (for US stocks)
         try:
             df = yf.download(ticker, period='1y', progress=False, timeout=10)
             if not df.empty:
-                print(f"✅ yfinance worked for {ticker}")
+                print(f"yfinance worked for {ticker}")
             else:
                 raise Exception("yfinance returned empty")
         except:
-            # Fallback to AKShare
-            print(f"🔄 Trying AKShare for {ticker}")
+            print(f" trying AKShare for {ticker}")
             df = fetch_stock_data_akshare(ticker, period="1y")
             if df.empty:
                 return None, None
@@ -149,21 +140,17 @@ def predict_price(ticker):
 
         return current_price, pred_price
     except Exception as e:
-        print(f"Prediction error for {ticker}: {e}")
+        print(f"prediction error for {ticker}: {e}")
         return None, None
 
-
-# ==================== CHART FUNCTION ====================
 def get_chart(ticker):
     try:
-        # Try yfinance first
         try:
             df = yf.download(ticker, period='3mo', progress=False, timeout=10)
             if df.empty:
                 raise Exception("yfinance returned empty")
         except:
-            # Fallback to AKShare
-            print(f"🔄 AKShare fallback for chart: {ticker}")
+            print(f"AKShare fallback for chart: {ticker}")
             df = fetch_stock_data_akshare(ticker, period="3mo")
             if df.empty:
                 return None
@@ -186,13 +173,10 @@ def get_chart(ticker):
 
         return fig.to_dict()
     except Exception as e:
-        print(f"Chart error for {ticker}: {e}")
+        print(f"chart error for {ticker}: {e}")
         return None
 
-
-# ==================== SCORING FUNCTIONS ====================
 def safe_float(value, default=0):
-    """Safely convert any value to float, handling pandas Series and None."""
     if value is None:
         return float(default)
     if isinstance(value, (pd.Series, pd.DataFrame)):
@@ -207,19 +191,16 @@ def safe_float(value, default=0):
 
 
 def calculate_moat_score(ticker):
-    """Durable Competitive Advantage Score (0-100)."""
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
 
-        # ✅ Use safe_float to avoid pandas Series issues
         roic = safe_float(info.get('returnOnCapital'), 0)
         gross_margin = safe_float(info.get('grossMargins'), 0)
         debt_to_equity = safe_float(info.get('debtToEquity'), 1.0)
         fcf = safe_float(info.get('freeCashflow'), 0)
         earnings_growth = safe_float(info.get('earningsGrowth'), 0)
 
-        # ROIC
         if roic > 0.15:
             roic_score = 100
         elif roic > 0.10:
@@ -229,7 +210,6 @@ def calculate_moat_score(ticker):
         else:
             roic_score = 10
 
-        # Gross Margin
         if gross_margin > 0.40:
             margin_score = 100
         elif gross_margin > 0.25:
@@ -237,7 +217,6 @@ def calculate_moat_score(ticker):
         else:
             margin_score = 30
 
-        # Debt-to-Equity
         if debt_to_equity < 0.5:
             debt_score = 100
         elif debt_to_equity < 1.0:
@@ -247,10 +226,8 @@ def calculate_moat_score(ticker):
         else:
             debt_score = 20
 
-        # Free Cash Flow
-        fcf_score = 100 if fcf > 0 else 30
+        fcf_score = 100 if fcf > 0 else 30 #free cash flow score
 
-        # Earnings Growth
         if earnings_growth > 0.10:
             growth_score = 100
         elif earnings_growth > 0:
@@ -272,12 +249,10 @@ def calculate_mos_score(ticker):
         stock = yf.Ticker(ticker)
         info = stock.info
 
-        # ✅ Use safe_float
         pe = safe_float(info.get('trailingPE'), 0)
         pb = safe_float(info.get('priceToBook'), 0)
         peg = safe_float(info.get('pegRatio'), 0)
 
-        # P/E Score
         sector_avg_pe = 20
         if pe > 0 and pe < sector_avg_pe * 0.8:
             pe_score = 100
@@ -288,15 +263,13 @@ def calculate_mos_score(ticker):
         else:
             pe_score = 10
 
-        # P/B Score
         if pb > 0 and pb < 1.5:
             pb_score = 100
         elif pb > 0 and pb < 3:
             pb_score = 60
         else:
             pb_score = 20
-
-        # PEG Score
+ 
         if peg > 0 and peg < 1:
             peg_score = 100
         elif peg > 0 and peg < 2:
@@ -304,7 +277,6 @@ def calculate_mos_score(ticker):
         else:
             peg_score = 20
 
-        # DCF Score (placeholder)
         dcf_score = 50
 
         return min(100, max(0, (pe_score * 0.30 + pb_score * 0.20 + peg_score * 0.20 + dcf_score * 0.30)))
@@ -313,8 +285,7 @@ def calculate_mos_score(ticker):
         return 50
 
 
-def calculate_sentiment_score(ticker):
-    """Sentiment Score (0-100)."""
+def calculate_sentiment_score(ticker): #do we really need this despite using FinBERT later?
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
@@ -326,7 +297,7 @@ def calculate_sentiment_score(ticker):
         rec_map = {'strong_buy': 100, 'buy': 75, 'hold': 50, 'sell': 25, 'strong_sell': 0}
         analyst_score = rec_map.get(recommendation, 50)
 
-        # Placeholder for news sentiment
+        #placeholder for news sentiment
         news_score = 50
 
         return min(100, max(0, (analyst_score * 0.50 + news_score * 0.50)))
@@ -361,13 +332,9 @@ def get_company_info(ticker):
         print(f"Info error for {ticker}: {e}")
         return None
 
-
-# ==================== MAIN ANALYSIS ENDPOINT ====================
 @app.route('/analyze/<ticker>')
 def analyze(ticker):
-    """Full analysis endpoint."""
     try:
-        # 1. Get price prediction
         current_price, predicted_price = predict_price(ticker)
         if current_price is None:
             return jsonify({'error': 'Stock not found or insufficient data'}), 404
@@ -375,23 +342,18 @@ def analyze(ticker):
         change_pct = ((predicted_price / current_price) - 1) * 100
         direction = 'up' if change_pct > 0 else 'down'
 
-        # 2. Get company info
         company_info = get_company_info(ticker)
 
-        # 3. Calculate scores
         moat = calculate_moat_score(ticker)
         mos = calculate_mos_score(ticker)
         sentiment = calculate_sentiment_score(ticker)
 
-        # 4. Long-term framework
         long_score = (moat * 0.55) + (mos * 0.30) + (sentiment * 0.15)
         long_verdict = 'BUY' if long_score >= 70 else 'HOLD' if long_score >= 50 else 'SELL'
 
-        # 5. Short-term framework
         short_score = (moat * 0.20) + (mos * 0.45) + (sentiment * 0.35)
         short_verdict = 'BUY' if short_score >= 70 else 'HOLD' if short_score >= 50 else 'SELL'
 
-        # 6. Get chart
         chart_data = get_chart(ticker)
 
         return jsonify({
@@ -428,7 +390,6 @@ def analyze(ticker):
         return jsonify({'error': str(e)}), 500
 
 
-# ==================== OTHER ROUTES ====================
 @app.route('/predict', methods=['POST'])
 def predict():
     data = request.json
@@ -474,7 +435,6 @@ def info(ticker):
         return jsonify({'error': str(e)}), 500
 
 
-# ==================== HEALTH CHECK ====================
 @app.route('/')
 def home():
     return jsonify({
