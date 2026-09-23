@@ -1,7 +1,5 @@
 [Read the Code version of the README, don't look through the Preview]
-#Goal of project
-
-Predict stock price trends while explaining the reasoning behind the prediction. 
+#Goal of project: Predict stock price trends while explaining the reasoning behind the prediction. 
 
 # Setup
 1. Create and activate a virtual environment
@@ -9,45 +7,43 @@ Predict stock price trends while explaining the reasoning behind the prediction.
    pip install -r requirements.txt
 3. Run the backend:
    python web_backend.py
-=======
-Preparing data for NTES
-Train windows: 2124, Test windows: 509
-Training LSTM
-  epoch    0  loss 1.026225
-  epoch   25  loss 0.993016
-  epoch   50  loss 0.989793
-  epoch   75  loss 0.987511
-  epoch  100  loss 0.986953
-  epoch  125  loss 0.986254
-  epoch  150  loss 0.984566
-  epoch  175  loss 0.976828
 
-Evaluating model
+What the model is currently doing: 
 
-======================================================================
-Metric                         Model    Baseline    Beats?
-----------------------------------------------------------------------
-rmse                         0.02494     0.02296        NO
-mae                          0.01757     0.01624        NO
-r2                          -0.18156     0.00000        NO
-directional_accuracy         0.50884     0.51277        NO
-======================================================================
+LSTM training & 5-day volatility prediction with evaluation metrics and significance testing
 
-Prediction variance / actual variance: 0.156
 
-Beats baseline on 0/4 metrics.
-Honest read: little to no evidence of real predictive skill at this horizon. Worth reporting as-is rather than tuning until the numbers look better -- that risks overfitting to this one test split rather than finding real signal.
+Baselines / tests:
+  - Persistence: matched-horizon trailing realized vol.
+  - Linear: same inputs as the LSTM, simplest possible model.
+  - Regime discrimination: AUC (label = top-quantile realized vol) +
+    Spearman, checked at TWO quantiles (0.75 and 0.90) -- a model can be
+    bad at general ranking but still good at flagging rare extreme days,
+    or vice versa; one threshold can hide that.
+  - Significance (block bootstrap, respects autocorrelation from
+    overlapping windows):
+      PRIMARY:   RMSE improvement, model vs. persistence
+      SECONDARY: AUC improvement, model vs. persistence (not just model
+                 vs. chance -- beating 0.5 isn't the same as beating a
+                 baseline that already has real discrimination power)
+  - Multi-seed: distribution of both, across retrainings.
 
-Up-rate by prediction decile (0=lowest predicted, N=highest):
-0    0.470588
-1    0.509804
-2    0.529412
-3    0.470588
-4    0.529412
-5    0.420000
-6    0.588235
-7    0.509804
-8    0.588235
-9    0.509804
-dtype: float64
->>>>>>> dae53c5 (model & README updated)
+
+Current results:
+| hidden_dim x num_layers| AUC@0.75 | Std | AUC@0.9 | Std | RMSE std |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 32 × 2 | 0.658 | 0.004 | 0.708 | 0.006 | 0.00279 |
+| 8 × 1 | 0.700 | 0.029 | 0.723 | 0.031 | 0.01972 |
+| 16 × 1 | 0.673 | 0.010 | 0.705 | 0.012 | 0.00549 |
+| 24 × 1 | 0.664 | 0.005 | 0.700 | 0.009 | 0.00410 |
+
+
+**Metrics**
+
+1. hidden_dim = size of the LSTM's working memory (short-term & long-term)
+2. num_layers = number of stacked LSTM layers.
+3. AUC@0.75 = area under the ROC curve for identifying top 25% of volatility days.
+4. AUC@0.90 = area under the ROC curve for identifying the top 10% of volatility days.
+5. Std = standard deviation across 20 random seeds.
+6. RMSE std = standard deviation of RMSE improvement over the persistence baseline.
+
