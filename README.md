@@ -16,10 +16,12 @@ LSTM training & 5-day volatility prediction with evaluation metrics and signific
 Current results:
 | hidden_dim x num_layers| mean AUC@0.75 | Std | mean AUC@0.9 | Std | RMSE std |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| 8 × 1 | 0.700 | 0.029 | 0.723 | 0.031 | 0.01972 |
-| 16 × 1 | 0.673 | 0.010 | 0.705 | 0.012 | 0.00549 |
-| 24 × 1 | 0.664 | 0.005 | 0.700 | 0.009 | 0.00410 |
-| 32 × 2 | 0.658 | 0.004 | 0.708 | 0.006 | 0.00279 |
+
+| 24 × 1 | 0.732 | 0.003 | 0.746 | 0.004 | - |
+
+Linear model (OLS)'s current mean RMSE: 0.7549
+
+[Our model is closing the gap between its mean RMSE and the linear model's RMSE]
 
 **NOTE:**
 
@@ -41,15 +43,15 @@ Current results:
 [Significance Test Results]
 
 PRIMARY -- RMSE improvement, model vs. persistence baseline:
-  Observed improvement: 0.06044
-  95% CI: [-0.01343, 0.11725]  (not significant (CI includes 0))
+  Observed improvement: 0.06434
+  95% CI: [-0.00565, 0.12426]  (not significant (CI includes 0))
 
 SECONDARY -- AUC improvement, model vs. persistence baseline (not just vs. chance):
   [quantile 0.75]
-    Observed AUC diff: +0.170
-    95% CI: [+0.100, +0.261]  (SIGNIFICANT)
+    Observed AUC diff: +0.232
+    95% CI: [+0.170, +0.322]  (SIGNIFICANT)
   [quantile 0.9]
-    Observed AUC diff: +0.208
-    95% CI: [+0.089, +0.342]  (SIGNIFICANT)
+    Observed AUC diff: +0.246
+    95% CI: [+0.168, +0.343]  (SIGNIFICANT)
 
 
